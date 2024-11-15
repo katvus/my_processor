@@ -7,7 +7,14 @@ class Registers(list):
 
 
 class Processor:
-    registers = Registers([0] * 16)
-    mem = [0] * 256
-    registers[2] = 255
-    pc = 1
+    def __init__(self, pc=1, registers=None, mem=None):
+        if registers is None:
+            self.registers = Registers([0] * 16)
+            self.registers[2] = 255
+        else:
+            self.registers = registers
+        if mem is None:
+            self.mem = [0] * 256
+        else:
+            self.mem = mem
+        self.pc = pc
