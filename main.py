@@ -1,4 +1,4 @@
-import instruction
+from instruction import Execution
 from exception import MyProgramError
 from processor import Processor
 
@@ -10,16 +10,17 @@ with open('data/factorial_sys', 'r', encoding='utf-8') as file:
         line = content[my_proc.pc - 1].split('//')[0].replace('\n', '')
         line = line.split(' ')
         try:
+            execute = Execution(my_proc, line)
             if line == ['сис']:
-                instruction.sys(my_proc)
+                execute.sys()
             elif len(line) == 4:
-                if not instruction.f_op_proc(line, my_proc):
-                    instruction.t_op_proc(line, my_proc)
+                if not execute.f_op():
+                    Execution.t_op()
             elif len(line) == 3:
-                instruction.s_op_proc(line, my_proc)
+                execute.s_op()
             else:
                 raise MyProgramError('недопустимая операция(количество операндов)')
         except MyProgramError as e:
-            print('{0} строка {1}'.format(my_proc.pc, e))  # номер строки как вывести
+            print('{0} строка {1}'.format(my_proc.pc, e))
             exit()
     print("Успех")
