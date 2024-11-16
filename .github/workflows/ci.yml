@@ -16,6 +16,6 @@ jobs:
           pip freeze > requirements.txt
           pip install -r requirements.txt
       - name: Run tests
-        run: python python -m unittest my_processor/test/test.py
+        run: python python -m unittest test_package/test.py
   
   
