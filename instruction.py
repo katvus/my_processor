@@ -1,6 +1,7 @@
 import enum
+from abc import ABC, abstractmethod
 
-from exception import MyProgramError
+from exception import TranslationError
 
 
 class Operation:
@@ -37,55 +38,86 @@ class Operation:
         proc.pc = proc.registers[rbase] + const
 
 
-class Execution:
-    __dict_f_op = {'сл': lambda a, b: a + b, 'выч': lambda a, b: a - b,
-                   'умн': lambda a, b: a * b, 'дел': lambda a, b: a / b,
-                   'и': lambda a, b: a & b, 'или': lambda a, b: a | b,
-                   'свл': lambda a, b: a << b, 'свп': lambda a, b: a >> b,
-                   'иили': lambda a, b: a ^ b}
-    __dict_s_op = {'вр': Operation.load_reg, 'пер': Operation.jump, 'усл': Operation.cond_jump}
-    __dict_t_op = {'изп': Operation.store_mem, 'вп': Operation.load_mem, 'опер': Operation.reg_jump}
+class Instruction(ABC):
+    @property
+    @abstractmethod
+    def dict_tr(self):
+        """Имя операции - двоичный код"""
+    @property
+    @abstractmethod
+    def dict_op(self):
+        """Двоичный код - операция"""
 
-    def __init__(self, processor, data):
-        self.proc = processor
-        self.data = data
+    @staticmethod
+    @abstractmethod
+    def translate(line):
+        """Трансляция в машинный код"""
 
-    def f_op(self):
-        if self.data[0] in self.__dict_f_op:
-            self.proc.registers[register_number(self.data[1])] = self.__dict_f_op[self.data[0]](
-                self.proc.registers[register_number(self.data[2])], self.proc.registers[register_number(self.data[3])])
-            self.proc.pc += 1
+    @staticmethod
+    @abstractmethod
+    def execute(data, proc):
+        """Исполнение команды"""
+
+
+class FirstInstruction(Instruction):
+    dict_tr = {'сл': '0010', 'выч': '0011', 'умн': '0100', 'дел': '0101',
+               'и': '1001', 'или': '1010', 'свл': '0111', 'свп': '0110', 'иили': '1011'}
+    dict_op = {'0010': lambda a, b: a + b, '0011': lambda a, b: a - b,
+               '0100': lambda a, b: a * b, '0101': lambda a, b: a / b,
+               '1001': lambda a, b: a & b, '1010': lambda a, b: a | b,
+               '0111': lambda a, b: a << b, '0110': lambda a, b: a >> b,
+               '1011': lambda a, b: a ^ b}
+
+    @staticmethod
+    def translate(line):
+        if line[0] in FirstInstruction.dict_tr and len(line) == 4:
+            return FirstInstruction.dict_tr[line[0]] + register_bin(line[1]) + register_bin(line[2]) + register_bin(line[3])
+        return 'null'
+
+    @staticmethod
+    def execute(data, proc):
+        if data[0] in FirstInstruction.dict_op:
+            proc.registers[int(data[1], 2)] = FirstInstruction.dict_op[data[0]](
+                proc.registers[int(data[2], 2)], proc.registers[int(data[3], 2)])
+            proc.pc += 1
             return True
         return False
 
-    def s_op(self):
-        if self.data[0] in self.__dict_s_op:
-            if isint(self.data[2]) and -128 <= int(self.data[2]) <= 127:
-                self.__dict_s_op[self.data[0]](register_number(self.data[1]), int(self.data[2]), self.proc)
-            else:
-                raise MyProgramError('не является числом в возможном диапазоне')
-        else:
-            raise MyProgramError('недопустимая операция')
 
-    def t_op(self):
-        if self.data[0] in self.__dict_t_op:
-            if isint(self.data[3]) and -8 <= int(self.data[3]) <= 7:
-                self.__dict_t_op[self.data[0]](register_number(self.data[1]), register_number(self.data[2]),  int(self.data[3]), self.proc)
-            else:
-                raise MyProgramError('не является числом в возможном диапазоне')
-        else:
-            raise MyProgramError('недопустимая операция')
+class SecondInstruction(Instruction):
+    dict_tr = {'вр': '1000', 'пер': '1101', 'усл': '1100'}
+    dict_op = {'1000': Operation.load_reg, '1101': Operation.jump, '1100': Operation.cond_jump}
 
-    def sys(self):
-        self.proc.pc += 1
-        if self.proc.registers[4] == SysCall.print.value:
-            print(self.proc.registers[5])
-        elif self.proc.registers[4] == SysCall.input.value:
-            self.proc.registers[5] = int(input())
-        elif self.proc.registers[4] == SysCall.exit.value:
-            exit()
-        else:
-            MyProgramError('недопустимый системный вызов')
+    @staticmethod
+    def translate(line):
+        if line[0] in SecondInstruction.dict_tr and len(line) == 3:
+            return SecondInstruction.dict_tr[line[0]] + register_bin(line[1]) + int_bin(line[2], 8)
+        return 'null'
+
+    @staticmethod
+    def execute(data, proc):
+        if data[0] in SecondInstruction.dict_op:
+            SecondInstruction.dict_op[data[0]](int(data[1], 2), from_bin(data[2] + data[3]), proc)
+            return True
+        return False
+
+
+class ThirdInstruction(Instruction):
+    dict_tr = {'изп': '0000', 'вп': '0001', 'опер': '1110'}
+    dict_op = {'0000': Operation.store_mem, '0001': Operation.load_mem, '1110': Operation.reg_jump}
+
+    @staticmethod
+    def translate(line):
+        if line[0] in ThirdInstruction.dict_tr and len(line) == 4:
+            return ThirdInstruction.dict_tr[line[0]] + register_bin(line[1]) + register_bin(line[2]) + int_bin(line[3], 4)
+        return 'null'
+
+    @staticmethod
+    def execute(data, proc):
+        if data[0] in ThirdInstruction.dict_op:
+            ThirdInstruction.dict_op[data[0]](int(data[1], 2), int(data[2], 2), from_bin(data[3]), proc)
+            return True
+        return False
 
 
 class SysCall(enum.Enum):
@@ -94,14 +126,49 @@ class SysCall(enum.Enum):
     input = 2
 
 
-def register_number(data):
+class SysInstruction(Instruction):
+    dict_tr = {'сис': '1111'}
+    dict_op = {'1111': SysCall}
+
+    @staticmethod
+    def translate(line):
+        if line == ['сис']:
+            return '1111000000000000'
+        return 'null'
+
+    @staticmethod
+    def execute(data, proc):
+        proc.pc += 1
+        if proc.registers[4] == SysCall.print.value:
+            print(proc.registers[5])
+        elif proc.registers[4] == SysCall.input.value:
+            proc.registers[5] = int(input())
+        elif proc.registers[4] == SysCall.exit.value:
+            exit()
+        else:
+            return False
+        return True
+
+
+def from_bin(data):
+    if data[0] == '0':
+        return int(data[1:], 2)
+    else:
+        count = len(data) - 1
+        return int(data[1:], 2) - 2**count
+
+
+def register_bin(data):
     if data[0] == 'р' and data[1:].isdigit():
         if 0 <= int(data[1:]) <= 15:
-            return int(data[1:])
-    raise MyProgramError('не является регистром')
+            return format(int(data[1:]), '04b')
+    raise TranslationError('не является регистром')
 
 
-def isint(data):
-    if (data[0] == '-' and data[1:].isdigit()) or data.isdigit():
-        return True
-    return False
+def int_bin(data, count):
+    if data.isdigit() and 0 <= int(data) < 2**(count - 1):
+        return format(int(data), f'0{count}b')
+    elif data[0] == '-' and data[1:].isdigit() and -2**(count - 1) <= int(data) < 0:
+        return bin(((1 << count) - 1) & int(data))[2:]
+    else:
+        raise TranslationError('не является числом в возможном диапазоне')
