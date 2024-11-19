@@ -1,8 +1,7 @@
 import unittest
 
 from processor import Processor
-from instruction import Operation
-from instruction import Execution
+from instruction import Operation, FirstInstruction, SecondInstruction, ThirdInstruction
 
 
 class ProcessorTest(unittest.TestCase):
@@ -54,24 +53,43 @@ class OperationTest(unittest.TestCase):
         self.assertEqual(self.proc.registers[2], 6)
 
 
-class ExecutionTest(unittest.TestCase):
-    def setUp(self):
-        self.proc = Processor()
-        self.proc.registers[11] = 3
-        self.proc.registers[12] = 2
-        self.proc.mem[9] = 13
+class FirstInstructionTest(unittest.TestCase):
+    def test_translate(self):
+        answer = FirstInstruction.translate(['сл', 'р12', 'р10', 'р11'])
+        self.assertEqual(answer, '0010110010101011')
 
-    def test_f_op(self):
-        Execution(self.proc, ["сл", "р10", "р11", "р12"]).f_op()
-        self.assertEqual(self.proc.registers[10], 5)
+    def test_execute(self):
+        proc = Processor(pc=5)
+        proc.registers[10] = 15
+        proc.registers[11] = -5
+        FirstInstruction.execute(['0010', '1100', '1010', '1011'], proc)
+        self.assertEqual(proc.registers[12], 10)
+        self.assertEqual(proc.pc, 6)
 
-    def test_s_op(self):
-        Execution(self.proc, ["усл", "р11", "21"]).s_op()
-        self.assertEqual(self.proc.pc, 22)
 
-    def test_t_op(self):
-        Execution(self.proc, ["изп", "р10", "р12", "7"]).t_op()
-        self.assertEqual(self.proc.registers[10], 13)
+class SecondInstructionTest(unittest.TestCase):
+    def test_translate(self):
+        answer = SecondInstruction.translate(['вр', 'р4', '-1'])
+        self.assertEqual(answer, '1000010011111111')
+
+    def test_execute(self):
+        proc = Processor(pc=5)
+        SecondInstruction.execute(['1000', '0100', '1111', '1111'], proc)
+        self.assertEqual(proc.registers[4], -1)
+        self.assertEqual(proc.pc, 6)
+
+
+class ThirdInstructionTest(unittest.TestCase):
+    def test_translate(self):
+        answer = ThirdInstruction.translate(['опер', 'р2', 'р4', '5'])
+        self.assertEqual(answer, '1110001001000101')
+
+    def test_execute(self):
+        proc = Processor(pc=5)
+        proc.registers[4] = 15
+        ThirdInstruction.execute(['1110', '0010', '0100', '0101'], proc)
+        self.assertEqual(proc.registers[2], 6)
+        self.assertEqual(proc.pc, 20)
 
 
 if __name__ == '__main__':
